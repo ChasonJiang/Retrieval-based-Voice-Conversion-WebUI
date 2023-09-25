@@ -4,6 +4,7 @@ import pickle
 import sys
 import traceback
 import logging
+from InferenceEngine import InferenceEngine
 
 from infer.lib import jit
 from infer.lib.jit.get_synthesizer import get_synthesizer
@@ -156,17 +157,35 @@ class RVC:
                 self.net_g.eval().to(self.device)
 
             def set_synthesizer():
-                if self.use_jit and not config.dml:
-                    if self.is_half and "cpu" in str(self.device):
-                        logger.warning(
-                            "Use default Synthesizer model. \
-                                    Jit is not supported on the CPU for half floating point"
-                        )
-                        set_default_model()
-                    else:
-                        set_jit_model()
-                else:
-                    set_default_model()
+                # if self.use_jit and not config.dml:
+                #     if self.is_half and "cpu" in str(self.device):
+                #         logger.warning(
+                #             "Use default Synthesizer model. \
+                #                     Jit is not supported on the CPU for half floating point"
+                #         )
+                #         set_default_model()
+                #     else:
+                #         set_jit_model()
+                # else:
+                #     set_default_model()
+                
+                self.net_g=InferenceEngine(
+                    "C:\\Users\\14404\\source\\repos\\Inference Engine\\x64\\Debug\\Inference Engine.dll",
+                    "C:\\Users\\14404\\Project\\Retrieval-based-Voice-Conversion-WebUI\\assets\\weights\\kikiV1.jit",
+                    device=self.device
+                )
+
+                # self.is_init_net_g=False
+                self.tgt_sr = self.net_g.model_sr
+                self.if_f0 = self.net_g.model_f0
+                self.version =self.net_g.model_version
+                inputs =jit.load_inputs("assets\Synthesizer_inputs.pth",self.device)
+                self.net_g.infer(inputs["phone"],inputs["phone_lengths"],
+                            inputs["pitch"],inputs["nsff0"],
+                            inputs["sid"],inputs["rate"])
+                self.net_g.infer(inputs["phone"],inputs["phone_lengths"],
+                            inputs["pitch"],inputs["nsff0"],
+                            inputs["sid"],inputs["rate"])
 
             if last_rvc is None or last_rvc.pth_path != self.pth_path:
                 set_synthesizer()
@@ -399,6 +418,7 @@ class RVC:
         p_len = torch.LongTensor([p_len]).to(self.device)
         ii = 0  # sid
         sid = torch.LongTensor([ii]).to(self.device)
+        rate = torch.FloatTensor([rate]).to(self.device)
         with torch.no_grad():
             if self.if_f0 == 1:
                 # print(12222222222,feats.device,p_len.device,cache_pitch.device,cache_pitchf.device,sid.device,rate2)
@@ -408,11 +428,11 @@ class RVC:
                     cache_pitch,
                     cache_pitchf,
                     sid,
-                    torch.FloatTensor([rate]),
+                    rate
                 )[0][0, 0].data.float()
             else:
                 infered_audio = self.net_g.infer(
-                    feats, p_len, sid, torch.FloatTensor([rate])
+                    feats, p_len, sid, rate
                 )[0][0, 0].data.float()
         t5 = ttime()
         logger.info(
