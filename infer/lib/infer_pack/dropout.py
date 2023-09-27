@@ -2,9 +2,9 @@ from typing import Any, Mapping
 from torch import Tensor
 import torch.nn as nn
 import torch
-class Dropouts(nn.Dropout):
+class Dropout(nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
-        super(Dropouts, self).__init__(p, inplace)
+        super(Dropout, self).__init__(p, inplace)
         self.is_eval= False
         self.drop = nn.Dropout(p, inplace)
 

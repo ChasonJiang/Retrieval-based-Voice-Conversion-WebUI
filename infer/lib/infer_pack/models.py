@@ -903,58 +903,6 @@ class SynthesizerTrnMs256NSFsidOnlyEncode(nn.Module):
         return z_masked, nsff0, g
     
 
-class DecodeForSynthesizer(nn.Module):
-    def __init__(
-        self,
-        inter_channels,
-        resblock,
-        resblock_kernel_sizes,
-        resblock_dilation_sizes,
-        upsample_rates,
-        upsample_initial_channel,
-        upsample_kernel_sizes,
-        gin_channels,
-        sr,
-    ):
-        super(DecodeForSynthesizer, self).__init__()
-        self.dec = GeneratorNSF(
-            inter_channels,
-            resblock,
-            resblock_kernel_sizes,
-            resblock_dilation_sizes,
-            upsample_rates,
-            upsample_initial_channel,
-            upsample_kernel_sizes,
-            gin_channels=gin_channels,
-            sr=sr,
-            is_half=False,
-        )
-
-    def forward(
-            self,
-            z_masked:torch.Tensor,
-            nsff0: torch.Tensor,
-            g: torch.Tensor
-    ):
-        o = self.dec(z_masked, nsff0, g=g)
-        return o
-    
-    def remove_weight_norm(self):
-        self.dec.remove_weight_norm()
-
-    def __prepare_scriptable__(self):
-        for hook in self.dec._forward_pre_hooks.values():
-            # The hook we want to remove is an instance of WeightNorm class, so
-            # normally we would do `if isinstance(...)` but this class is not accessible
-            # because of shadowing, so we check the module name directly.
-            # https://github.com/pytorch/pytorch/blob/be0ca00c5ce260eb5bcec3237357f7a30cc08983/torch/nn/utils/__init__.py#L3
-            if (
-                hook.__module__ == "torch.nn.utils.weight_norm"
-                and hook.__class__.__name__ == "WeightNorm"
-            ):
-                torch.nn.utils.remove_weight_norm(self.dec)
-        return self
-
 class SynthesizerTrnMs768NSFsid(nn.Module):
     def __init__(
         self,

@@ -170,22 +170,21 @@ class RVC:
                 #     set_default_model()
                 
                 self.net_g=InferenceEngine(
-                    "C:\\Users\\14404\\source\\repos\\Inference Engine\\x64\\Debug\\Inference Engine.dll",
+                    "C:\\Users\\14404\\source\\repos\\Inference Engine 2\\x64\\Release\\Inference Engine.dll",
                     "C:\\Users\\14404\\Project\\Retrieval-based-Voice-Conversion-WebUI\\assets\\weights\\kikiV1.jit",
                     device=self.device
                 )
 
-                # self.is_init_net_g=False
                 self.tgt_sr = self.net_g.model_sr
                 self.if_f0 = self.net_g.model_f0
                 self.version =self.net_g.model_version
-                inputs =jit.load_inputs("assets\Synthesizer_inputs.pth",self.device)
-                self.net_g.infer(inputs["phone"],inputs["phone_lengths"],
-                            inputs["pitch"],inputs["nsff0"],
-                            inputs["sid"],inputs["rate"])
-                self.net_g.infer(inputs["phone"],inputs["phone_lengths"],
-                            inputs["pitch"],inputs["nsff0"],
-                            inputs["sid"],inputs["rate"])
+                # inputs =jit.load_inputs("assets\Synthesizer_inputs.pth",self.device)
+                # self.net_g.infer(inputs["phone"],inputs["phone_lengths"],
+                #             inputs["pitch"],inputs["nsff0"],
+                #             inputs["sid"],inputs["rate"])
+                # self.net_g.infer(inputs["phone"],inputs["phone_lengths"],
+                #             inputs["pitch"],inputs["nsff0"],
+                #             inputs["sid"],inputs["rate"])
 
             if last_rvc is None or last_rvc.pth_path != self.pth_path:
                 set_synthesizer()

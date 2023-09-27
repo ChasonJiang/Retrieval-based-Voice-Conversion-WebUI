@@ -4,11 +4,10 @@ import pickle
 import torch
 
 def get_synthesizer(pth_path, device=torch.device("cpu")):
-    from infer.lib.infer_pack.models import (
-        SynthesizerTrnMs256NSFsid,
-        SynthesizerTrnMs256NSFsid_nono,
-        SynthesizerTrnMs768NSFsid,
-        SynthesizerTrnMs768NSFsid_nono,
+    from infer.lib.infer_pack.infer_models import (
+        SynthesizerTrnMs256NSFsidOnlyEncode_nono,
+        SynthesizerTrnMs768NSFsidOnlyEncode,
+        SynthesizerTrnMs768NSFsidOnlyEncode_nono,
         SynthesizerTrnMs256NSFsidOnlyEncode,
         DecodeForSynthesizer
     )
@@ -24,12 +23,12 @@ def get_synthesizer(pth_path, device=torch.device("cpu")):
         if if_f0 == 1:
             net_g = SynthesizerTrnMs256NSFsidOnlyEncode(*synthesizer_config)
         else:
-            net_g = SynthesizerTrnMs256NSFsid_nono(*synthesizer_config)
+            net_g = SynthesizerTrnMs256NSFsidOnlyEncode_nono(*synthesizer_config)
     elif version == "v2":
         if if_f0 == 1:
-            net_g = SynthesizerTrnMs768NSFsid(*synthesizer_config, is_half=False)
+            net_g = SynthesizerTrnMs768NSFsidOnlyEncode(*synthesizer_config)
         else:
-            net_g = SynthesizerTrnMs768NSFsid_nono(*synthesizer_config)
+            net_g = SynthesizerTrnMs768NSFsidOnlyEncode_nono(*synthesizer_config)
     del net_g.enc_q
     decoder_config = [config[2],*config[-9:-3],*config[-2:]]
     decoder = DecodeForSynthesizer(*decoder_config)
@@ -59,7 +58,7 @@ def export(
     model_jit.to(device)
     model_jit = model_jit.half() if is_half else model_jit.float()
     buffer = BytesIO()
-    # model_jit=model_jit.cpu()
+    model_jit=model_jit.cpu()
     torch.jit.save(model_jit, buffer)
     del model_jit
     model_bytes = buffer.getvalue()

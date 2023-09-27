@@ -1,5 +1,4 @@
 import ctypes
-from io import BytesIO
 import math
 import os
 import threading
@@ -8,7 +7,6 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from infer.lib import jit
-# from tools import jit
 
 from infer.lib.jit import load_inputs
 # os.environ["PYTORCH_NVFUSER_DISABLE"]="fallback"
@@ -86,17 +84,8 @@ class C_Inputs2(ctypes.Structure):
     ]
     # _pack_=1
 
-class C_Inputs3(ctypes.Structure):
-    _fields_=[
-        ("z_masked", C_FloatTS),
-        ("nsff0", C_FloatTS),
-        ("g", C_FloatTS),
-    ]
-    # _pack_=1
-
-
 class Inputs1:
-    def __init__(self,feats:torch.FloatTensor,p_len:torch.LongTensor,
+    def __init__(self,feats:torch.Tensor,p_len:torch.LongTensor,
                  cache_pitch:torch.LongTensor,cache_pitchf:torch.Tensor,
                  sid:torch.LongTensor,rate:torch.FloatTensor):
         self.value=None
@@ -113,7 +102,7 @@ class Inputs1:
                                 )
 
 class Inputs2:
-    def __init__(self,feats:torch.FloatTensor,p_len:torch.LongTensor,
+    def __init__(self,feats:torch.Tensor,p_len:torch.LongTensor,
                  sid:torch.LongTensor,rate:torch.FloatTensor):
         self.value=None
         c_feats=FloatTS(feats).value
@@ -122,19 +111,6 @@ class Inputs2:
         c_rate=FloatTS(rate).value
         self.value = C_Inputs2(feats=c_feats,p_len=c_p_len,
                                 sid=c_sid,rate=c_rate
-                                )
-        
-class Inputs3:
-    def __init__(self,z_masked:torch.FloatTensor,
-                 nsff0:torch.FloatTensor,
-                 g:torch.FloatTensor):
-        self.value=None
-        c_z_masked=FloatTS(z_masked).value
-        c_nsff0=FloatTS(nsff0).value
-        c_g=FloatTS(g).value
-        self.value = C_Inputs3(z_masked=c_z_masked,
-                                nsff0=c_nsff0,
-                                g=c_g
                                 )
         
 
@@ -165,7 +141,6 @@ class InferenceEngine:
         self.model_sr=None
         self.model_f0=None
         self.model_is_half=False
-        self.encoder:torch.nn.Module = None
         # self.infer_sem=threading.Semaphore(1)
         if model_path:
             self.init_model(self.model_path,self.device_index)
@@ -194,14 +169,13 @@ class InferenceEngine:
         self.model_f0 =ckpt.get("f0",1)
         self.model_is_half =ckpt.get("is_half",False)
         self.upsample_rates = UPSAMPE_REAETS[self.model_version][self.model_sr]
-        model_bytes:dict = ckpt.get("model")
-        self.encoder = torch.jit.load(BytesIO(model_bytes["encoder"]),map_location=self.device)
-        self.encoder=self.encoder.to(self.device)
+        model_byte:bytes = ckpt.get("model")
+
         model_device_index = self.get_device_index(ckpt.get("device"))
         # if model_device_index !=device_index:
         #     raise RuntimeError("The model inference device is inconsistent with the current inference device!")
 
-        bytes_model = ctypes.pointer(C_BytesModel(model_bytes["decoder"],len(model_bytes["decoder"])))
+        bytes_model = ctypes.pointer(C_BytesModel(model_byte,len(model_byte)))
         res = ctypes.pointer(C_InitResults(-1))
         self.engine.init_model(bytes_model,device_index,res)
         if res.contents.state_code!=0:
@@ -223,7 +197,7 @@ class InferenceEngine:
             self.engine.infer2(inputs,outputs)
         else:
             inputs = ctypes.pointer(Inputs1(*args).value)
-            self.engine.test(inputs,outputs)
+            self.engine.infer1(inputs,outputs)
         # time.sleep(0.5)
         # self.infer_sem.release()
         return [outputs_tensor.clone().to(self.device)]
@@ -242,14 +216,12 @@ class InferenceEngine:
              sid:torch.Tensor,rate:torch.Tensor,
              ):
         outputs_tensor = self.get_output_tensor(feats,rate)
-        z_masked,nsff0,g= self.encoder(feats, p_len, cache_pitch,
-                                       cache_pitchf, sid, rate)
         outputs = ctypes.pointer(FloatTS(outputs_tensor).value)
-        inputs = ctypes.pointer(Inputs3(z_masked, nsff0, g).value)
-        
+        inputs = ctypes.pointer(Inputs1(feats, p_len, cache_pitch, 
+                                        cache_pitchf, sid, rate).value)
         self.engine.test(inputs,outputs)
-        print(outputs_tensor)
-        return [outputs_tensor.clone().to(self.device)]
+        # print(outputs_tensor)
+        return [outputs_tensor.to(self.device)]
     
     def test2(self,*args):
    
@@ -298,22 +270,22 @@ if __name__ =="__main__":
     epoch=1000
     total_ts = 0.0
     
-    ie.test(inputs["phone"],inputs["phone_lengths"],
-                inputs["pitch"],inputs["nsff0"],
-                inputs["sid"],inputs["rate"])
-    ie.test(inputs["phone"],inputs["phone_lengths"],
-                inputs["pitch"],inputs["nsff0"],
-                inputs["sid"],inputs["rate"])
+    # ie.infer(inputs["phone"],inputs["phone_lengths"],
+    #             inputs["pitch"],inputs["nsff0"],
+    #             inputs["sid"],inputs["rate"])
+    # ie.infer(inputs["phone"],inputs["phone_lengths"],
+    #             inputs["pitch"],inputs["nsff0"],
+    #             inputs["sid"],inputs["rate"])
     # time.sleep(1)
-    # bar=tqdm(range(epoch))
-    # for i in bar:
-    #     start_time=time.perf_counter()
-    #     ie.test(inputs["phone"],inputs["phone_lengths"],
-    #                 inputs["pitch"],inputs["nsff0"],
-    #                 inputs["sid"],inputs["rate"])
+    bar=tqdm(range(epoch))
+    for i in bar:
+        start_time=time.perf_counter()
+        ie.infer(inputs["phone"],inputs["phone_lengths"],
+                    inputs["pitch"],inputs["nsff0"],
+                    inputs["sid"],inputs["rate"])
     
-    #     total_ts+=time.perf_counter()-start_time
-    # print(f"num_epoch: {epoch} | avg time(ms): {(total_ts*1000)/epoch}")
+        total_ts+=time.perf_counter()-start_time
+    print(f"num_epoch: {epoch} | avg time(ms): {(total_ts*1000)/epoch}")
 
     # inputs =load_inputs("inputs.pth",torch.device("cuda:0"))
     # bar=tqdm(range(epoch))

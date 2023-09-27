@@ -16,7 +16,7 @@ import multiprocessing
 logger = logging.getLogger(__name__)
 stream_latency = -1
 
-
+SR=48000
 class Harvest(multiprocessing.Process):
     def __init__(self, inp_q, opt_q):
         multiprocessing.Process.__init__(self)
@@ -618,6 +618,13 @@ if __name__ == "__main__":
             self.resampler = tat.Resample(
                 orig_freq=self.gui_config.samplerate, new_freq=16000, dtype=torch.float32
             ).to(self.config.device)
+            self.resampler_to_device = tat.Resample(
+                orig_freq=self.gui_config.samplerate, new_freq=SR, dtype=torch.float32
+            ).to(self.config.device)
+
+            self.resampler_to_model = tat.Resample(
+                orig_freq=SR, new_freq=self.gui_config.samplerate, dtype=torch.float32
+            ).to(self.config.device)
             self.tg = TorchGate(
                 sr=self.gui_config.samplerate, n_fft=4 * self.zc, prop_decrease=0.9
             ).to(self.config.device)
@@ -633,7 +640,7 @@ if __name__ == "__main__":
                 channels=channels,
                 callback=self.audio_callback,
                 blocksize=self.block_frame,
-                samplerate=self.gui_config.samplerate,
+                samplerate=SR,
                 dtype="float32",
             ) as stream:
                 global stream_latency
@@ -664,7 +671,9 @@ if __name__ == "__main__":
             self.input_wav[: -self.block_frame] = self.input_wav[
                 self.block_frame :
             ].clone()
-            self.input_wav[-self.block_frame :] = torch.from_numpy(indata).to(self.config.device)
+            indata_tensor = torch.from_numpy(indata).to(self.config.device)
+            indata_tensor = self.resampler_to_model(indata_tensor)
+            self.input_wav[-self.block_frame :] = indata_tensor
             self.input_wav_res[: -self.block_frame_16k] = self.input_wav_res[
                 self.block_frame_16k :
             ].clone()
@@ -782,13 +791,14 @@ if __name__ == "__main__":
             infer_wav[: self.crossfade_frame] *= self.fade_in_window
             infer_wav[: self.crossfade_frame] += self.sola_buffer * self.fade_out_window
             self.sola_buffer[:] = infer_wav[-self.crossfade_frame :]
+            outdata_tensor=self.resampler_to_device(infer_wav[: -self.crossfade_frame])
             if sys.platform == "darwin":
                 outdata[:] = (
-                    infer_wav[: -self.crossfade_frame].cpu().numpy()[:, np.newaxis]
+                    outdata_tensor.cpu().numpy()[:, np.newaxis]
                 )
             else:
                 outdata[:] = (
-                    infer_wav[: -self.crossfade_frame].repeat(2, 1).t().cpu().numpy()
+                    outdata_tensor.repeat(2, 1).t().cpu().numpy()
                 )
             total_time = time.perf_counter() - start_time
             self.window["infer_time"].update(int(total_time * 1000))

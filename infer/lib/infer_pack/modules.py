@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn import AvgPool1d, Conv1d, Conv2d, ConvTranspose1d
 from torch.nn import functional as F
 from torch.nn.utils import remove_weight_norm, weight_norm
-from .dropout import Dropouts
+from .dropout import Dropout
 from infer.lib.infer_pack import commons
 from infer.lib.infer_pack.commons import get_padding, init_weights
 from infer.lib.infer_pack.transforms import piecewise_rational_quadratic_transform
@@ -59,7 +59,7 @@ class ConvReluNorm(nn.Module):
             )
         )
         self.norm_layers.append(LayerNorm(hidden_channels))
-        self.relu_drop = nn.Sequential(nn.ReLU(), Dropouts(float(p_dropout)))
+        self.relu_drop = nn.Sequential(nn.ReLU(), Dropout(float(p_dropout)))
         for _ in range(n_layers - 1):
             self.conv_layers.append(
                 nn.Conv1d(
@@ -96,7 +96,7 @@ class DDSConv(nn.Module):
         self.n_layers = n_layers
         self.p_dropout = float(p_dropout)
 
-        self.drop = Dropouts(float(p_dropout))
+        self.drop = Dropout(float(p_dropout))
         self.convs_sep = nn.ModuleList()
         self.convs_1x1 = nn.ModuleList()
         self.norms_1 = nn.ModuleList()
@@ -154,7 +154,7 @@ class WN(torch.nn.Module):
 
         self.in_layers = torch.nn.ModuleList()
         self.res_skip_layers = torch.nn.ModuleList()
-        self.drop = Dropouts(float(p_dropout))
+        self.drop = Dropout(float(p_dropout))
 
         if gin_channels != 0:
             cond_layer = torch.nn.Conv1d(

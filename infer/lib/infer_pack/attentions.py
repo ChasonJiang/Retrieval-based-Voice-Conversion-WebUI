@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
-from .dropout import Dropouts
+from .dropout import Dropout
 from infer.lib.infer_pack import commons, modules
 from infer.lib.infer_pack.modules import LayerNorm
 
@@ -32,7 +32,7 @@ class Encoder(nn.Module):
         self.p_dropout = p_dropout
         self.window_size = window_size
 
-        self.drop = Dropouts(p_dropout)
+        self.drop = Dropout(p_dropout)
         self.attn_layers = nn.ModuleList()
         self.norm_layers_1 = nn.ModuleList()
         self.ffn_layers = nn.ModuleList()
@@ -100,7 +100,7 @@ class Decoder(nn.Module):
         self.proximal_bias = proximal_bias
         self.proximal_init = proximal_init
 
-        self.drop = Dropouts(p_dropout)
+        self.drop = Dropout(p_dropout)
         self.self_attn_layers = nn.ModuleList()
         self.norm_layers_0 = nn.ModuleList()
         self.encdec_attn_layers = nn.ModuleList()
@@ -195,7 +195,7 @@ class MultiHeadAttention(nn.Module):
         self.conv_k = nn.Conv1d(channels, channels, 1)
         self.conv_v = nn.Conv1d(channels, channels, 1)
         self.conv_o = nn.Conv1d(channels, out_channels, 1)
-        self.drop = Dropouts(p_dropout)
+        self.drop = Dropout(p_dropout)
 
         if window_size is not None:
             n_heads_rel = 1 if heads_share else n_heads
@@ -412,7 +412,7 @@ class FFN(nn.Module):
 
         self.conv_1 = nn.Conv1d(in_channels, filter_channels, kernel_size)
         self.conv_2 = nn.Conv1d(filter_channels, out_channels, kernel_size)
-        self.drop = Dropouts(p_dropout)
+        self.drop = Dropout(p_dropout)
 
     def padding(self, x: torch.Tensor, x_mask: torch.Tensor) -> torch.Tensor:
         if self.causal:
